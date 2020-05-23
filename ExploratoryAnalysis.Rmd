@@ -1,0 +1,136 @@
+---
+title: "Netlify Twitter Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+p_needed <- c("plyr", "dplyr", "stringr", "lubridate", "jsonlite", "httr", 
+              "xml2", "rvest", "devtools", "ggmap",  "networkD3", "RSelenium", 
+              "pageviews", "aRxiv", "twitteR", "streamR","igraph","rbokeh",
+              "shiny","animation","caTools","wordcloud","coreNLP","plotly","DT")
+lapply(p_needed, require, character.only = TRUE)
+library(pageviews)
+library(lubridate)
+library(dygraphs)
+library(xts)
+library(leaflet)
+library(maps)
+```
+
+## Tweet-Retweet Network
+
+
+```{r, warning=FALSE}
+dat <- read.csv("Data/tweets_netlify2020-05-22.csv",stringsAsFactors = F)
+dat = dat %>% filter(screenName != 'Netlify')
+tweet_txt <- dat$text
+rt_patterns = grep("(RT|via)((?:\\b\\W*@\\w+)+)",tweet_txt, ignore.case=TRUE)
+# we create a list to store user names
+who_retweet = as.list(1:length(rt_patterns))
+who_post = as.list(1:length(rt_patterns))
+
+# for loop
+for (i in 1:length(rt_patterns))
+{
+  # get tweet with retweet entity
+  twit = dat[rt_patterns[i],]
+  # get retweet source
+  poster = str_extract_all(twit$text,"(RT|via)((?:\\b\\W*@\\w+)+)")
+  #remove ':'
+  poster = gsub(":", "", unlist(poster))
+  # name of retweeted user
+  who_post[[i]] = gsub("(RT @|via @)", "", poster, ignore.case=TRUE)
+  # name of retweeting user
+  who_retweet[[i]] = rep(as.character(twit$screenName), length(poster))
+}
+
+# and we put it off the list
+who_post = sub("@.*","",unlist(who_post))
+who_retweet = sub("@.*","",unlist(who_retweet))
+who_retweet = sub(" ","",who_retweet)
+retweeter_poster = cbind(who_retweet, who_post)
+
+name <- unique(c(who_retweet,who_post))
+who_retweet <- match(who_retweet, name)-1
+who_post <- match(who_post, name)-1
+## checking
+#checkid<-which(retweeter_poster[,2]=="Deere_Andrea")
+#retweeter_poster[checkid,]
+links <- data.frame(who_retweet, who_post)
+size <- rep(0.1,length(name))
+tb <- table(who_post+1)
+size[as.numeric(names(tb))]<-tb
+
+group <- rep("Retweet",length(name))
+group[which(name%in%retweeter_poster[,2])] <- "Tweet"
+group[which(name%in%retweeter_poster[,1]&
+              name%in%retweeter_poster[,2])] <- "Both"
+# table(group)
+group <- factor(group, levels = c("Both", "Retweet", "Tweet"))
+notes <- data.frame(name, group, size)
+
+# summary(notes)
+# Plot
+networkD3::forceNetwork(Links = links, Nodes = notes,
+             Source = "who_retweet", Target = "who_post",
+             # Value = "value", 
+             Nodesize = "size",
+             NodeID = "name",
+             Group = "group", 
+             fontSize = 16,
+             # colourScale = JS("d3.scaleSequential(d3.interpolateRainbow)"),
+             legend=T,
+             opacity = 1)
+```
+
+## Who to target?
+
+```{r}
+datatable(notes, options = list (order = list(3, 'desc')))
+```
+
+## Summary Statistics
+
+```{r, warning=FALSE}
+dat <- read.csv("Data/tweets_netlify2020-05-22.csv",)
+dat = dat %>% filter(screenName != 'Netlify')
+pb.txt <- dat$created
+pb.date <- as.POSIXct(pb.txt, tz="GMT")
+dat$cdt <- format(pb.date, tz="America/Los_Angeles",usetz=TRUE)
+rt1 <- dat%>%filter(isRetweet==T)
+rt0 <- dat%>%filter(isRetweet==F)
+```
+
+- From 2018-02-21 to 2018-04-04 
+- There are `r nrow(dat)` tweets, `r nrow(rt0)` original tweets  
+
+## When is the best time to tweet? 
+ 
+- Total Tweet Counts
+
+```{r}
+month <- as.numeric(substr(dat$cdt,6,7))
+day <- as.numeric(substr(dat$cdt,9,10))
+time<-as.numeric(substr(dat$cdt,12,13))
+par(mfrow=c(1,2))
+barplot(table(month), main="Counts by Month")
+barplot(table(time), main="Counts by Time of the Day (PST)")
+```
+
+## When is the best time to tweet? 
+
+- Tweet and Re-tweet counts by time of the day
+
+```{r, echo=F}
+# separate by tweet and re-tweet
+month <- as.numeric(substr(rt0$cdt,6,7))
+day <- as.numeric(substr(rt0$cdt,9,10))
+time<-as.numeric(substr(rt0$cdt,12,13))
+par(mfrow=c(1,2))
+barplot(table(time), main="Tweet (PST)")
+month <- as.numeric(substr(rt1$cdt,6,7))
+day <- as.numeric(substr(rt1$cdt,9,10))
+time<-as.numeric(substr(rt1$cdt,12,13))
+barplot(table(time), main="Re-tweet (PST)")
+```
