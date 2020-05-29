@@ -1,0 +1,73 @@
+---
+title: "Language Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(dplyr)
+library(shiny)
+library(coreNLP)
+library(wordcloud)
+library(wordcloud2)
+library(tm)
+library(NLP)
+```
+
+# Netlify 
+
+```{r}
+load("Results/tweet_anno.RData")
+
+# load object annotres
+token<-data.frame(annotres$token)
+ut = universalTagset(token$POS)
+# idx<-which(ut=="NOUN")
+# token$token[idx]
+
+ptree<-getParse(annotres)
+dep<-getDependency(annotres)
+# head(dep)
+
+senid<-dep$sentence[which(dep$dependent=="Netlify")]
+depeng<-dep[which(dep$dependent=="Netlify"),]
+
+res_all = NULL
+
+for (i in seq_along(depeng$sentence)){
+  idx<-depeng$sentence
+  getid<-c(depeng[i,]$dependentIdx:depeng[i,]$governorIdx)
+  res<-paste(token$token[token$sentence==idx[i]][getid],collapse = " ")
+  res_all = c(res_all,res)
+}
+
+sentLen = table(getToken(annotres)$sentence)
+# names(annotres$token)[3]<-"word"
+
+## Netlify
+# get only adv, noun, adj
+
+
+idx_netlify<-which(token$POS %in% c("JJ"))
+word_idx_netlify<-tolower(token$lemma[idx_netlify])
+word_idx_netlify=word_idx_netlify[word_idx_netlify!="netlify"]
+word_idx_netlify=word_idx_netlify[word_idx_netlify!="@netlify"]
+
+
+
+# wordcloud(words= tb$word_idx_netlify,
+#          freq = tb$Freq,
+#          min.freq =5,
+#          random.order=FALSE, 
+#          max.words=200,
+          # rot.per=0.15, 
+#          colors=brewer.pal(8, "Dark2"))
+tb = table(word_idx_netlify)
+tb = data.frame(tb)
+p = wordcloud2(data=tb%>%filter(Freq >= 10), 
+           size=1.6, color='random-dark')
+p
+```
+
+```
+

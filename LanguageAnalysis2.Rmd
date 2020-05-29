@@ -1,0 +1,36 @@
+---
+title: "Language Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(dplyr)
+library(shiny)
+library(coreNLP)
+library(wordcloud)
+library(wordcloud2)
+library(tm)
+library(NLP)
+```
+
+
+```{r}
+load("Results/tweet_vercel.RData")
+
+########### vercel
+token_vercel<-data.frame(annotres_vercel$token)
+
+idx_vercel<-which(token_vercel$POS %in% c("JJ"))
+word_idx_vercel<-tolower(token_vercel$lemma[idx_vercel])
+word_idx_vercel=word_idx_vercel[word_idx_vercel!="vercel"]
+word_idx_vercel=word_idx_vercel[word_idx_vercel!="@vercel"]
+word_idx_vercel=word_idx_vercel[word_idx_vercel!="netlify"]
+word_idx_vercel=word_idx_vercel[word_idx_vercel!="@netlify"]
+
+tb2 = table(word_idx_vercel)
+tb2 = data.frame(tb2)
+p2 = wordcloud2(data=tb2%>%filter(Freq >= 10), 
+           size=1.6, color='random-dark',  shape = 'pentagon')
+p2
+# wordcloud(words= word_idx_vercel, min.freq =5)
